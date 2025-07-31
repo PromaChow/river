@@ -1,9 +1,5 @@
 name: code-quality
-
 on:
-  pull_request:
-    branches:
-      - "*"
   push:
     branches:
       - main
@@ -12,19 +8,54 @@ jobs:
   ubuntu:
     runs-on: ubuntu-latest
     steps:
+      - name: Start Energy Measurement
+        uses: green-coding-solutions/eco-ci-energy-estimation@862050e4f01f65b1436e5eca18ba4bd85562f0de
+        with:
+          json-output: true
+          task: start-measurement
       - uses: actions/checkout@v4
-
       - name: Build River
         uses: ./.github/actions/install-env
         with:
-          python-version: "3.13"
           build-root: false
-
+          python-version: '3.13'
       - name: MyPy type check
         run: poetry run mypy
-
+      - id: measurement-4
+        name: Record Measurement After MyPy type check
+        uses: green-coding-solutions/eco-ci-energy-estimation@862050e4f01f65b1436e5eca18ba4bd85562f0de
+        with:
+          json-output: true
+          label: MyPy type check
+          task: get-measurement
       - name: Ruff code linting
         run: poetry run ruff check --output-format=github river/
-
+      - id: measurement-6
+        name: Record Measurement After Ruff code linting
+        uses: green-coding-solutions/eco-ci-energy-estimation@862050e4f01f65b1436e5eca18ba4bd85562f0de
+        with:
+          json-output: true
+          label: Ruff code linting
+          task: get-measurement
       - name: Ruff code formatting
         run: poetry run ruff format --check river/
+      - id: measurement-8
+        name: Record Measurement After Ruff code formatting
+        uses: green-coding-solutions/eco-ci-energy-estimation@862050e4f01f65b1436e5eca18ba4bd85562f0de
+        with:
+          json-output: true
+          label: Ruff code formatting
+          task: get-measurement
+      - id: display-measurement
+        name: Display Energy Results
+        uses: green-coding-solutions/eco-ci-energy-estimation@862050e4f01f65b1436e5eca18ba4bd85562f0de
+        with:
+          json-output: true
+          task: display-results
+      - name: Save Total Energy Consumption Data
+        run: echo '${{ steps.final-measurement.outputs.data-total-json }}' > total_energy_consumption.json
+      - name: Upload Energy Consumption Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: total-energy-consumption
+          path: total_energy_consumption.json

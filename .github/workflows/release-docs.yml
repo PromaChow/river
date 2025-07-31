@@ -1,59 +1,129 @@
 name: release-docs
-
 on:
-  workflow_dispatch:
   push:
-    tags:
-      - "*"
+    branches:
+      - main
 
 jobs:
   ubuntu:
     runs-on: ubuntu-latest
     steps:
+      - name: Start Energy Measurement
+        uses: green-coding-solutions/eco-ci-energy-estimation@862050e4f01f65b1436e5eca18ba4bd85562f0de
+        with:
+          json-output: true
+          task: start-measurement
       - uses: actions/checkout@v4
-
       - name: Build River
         uses: ./.github/actions/install-env
         with:
-          # Use 3.12 for the docs env waiting for spaCy and srsly to support 3.13
-          python-version: "3.12"
-
+          python-version: '3.12'
       - name: Install extra Ubuntu dependencies
         run: sudo apt-get install graphviz pandoc
-
+      - id: measurement-4
+        name: Record Measurement After Install extra Ubuntu dependencies
+        uses: green-coding-solutions/eco-ci-energy-estimation@862050e4f01f65b1436e5eca18ba4bd85562f0de
+        with:
+          json-output: true
+          label: Install extra Ubuntu dependencies
+          task: get-measurement
       - name: Install extra Python dependencies
-        run: |
-          poetry install --with docs --with compat
+        run: 'poetry install --with docs --with compat
+
           poetry run python -m spacy download en_core_web_sm
 
+          '
+      - id: measurement-6
+        name: Record Measurement After Install extra Python dependencies
+        uses: green-coding-solutions/eco-ci-energy-estimation@862050e4f01f65b1436e5eca18ba4bd85562f0de
+        with:
+          json-output: true
+          label: Install extra Python dependencies
+          task: get-measurement
       - name: Use Rich in notebooks
-        run: |
-          poetry run ipython profile create
+        run: 'poetry run ipython profile create
+
           echo "%load_ext rich" > ~/.ipython/profile_default/startup/00_rich.ipy
 
+          '
+      - id: measurement-8
+        name: Record Measurement After Use Rich in notebooks
+        uses: green-coding-solutions/eco-ci-energy-estimation@862050e4f01f65b1436e5eca18ba4bd85562f0de
+        with:
+          json-output: true
+          label: Use Rich in notebooks
+          task: get-measurement
       - name: Execute notebooks
-        run: |
-          source $VENV
+        run: 'source $VENV
+
           make execute-notebooks
 
+          '
+      - id: measurement-10
+        name: Record Measurement After Execute notebooks
+        uses: green-coding-solutions/eco-ci-energy-estimation@862050e4f01f65b1436e5eca18ba4bd85562f0de
+        with:
+          json-output: true
+          label: Execute notebooks
+          task: get-measurement
       - name: Build docs
-        run: |
-          source $VENV
+        run: 'source $VENV
+
           make doc
 
-      - name: Deploy docs
-        env:
+          '
+      - id: measurement-12
+        name: Record Measurement After Build docs
+        uses: green-coding-solutions/eco-ci-energy-estimation@862050e4f01f65b1436e5eca18ba4bd85562f0de
+        with:
+          json-output: true
+          label: Build docs
+          task: get-measurement
+      - env:
           GH_TOKEN: ${{ secrets.GitHubToken }}
-        run: |
-          source $VENV
+        name: Deploy docs
+        run: 'source $VENV
+
           git config user.name github-actions
+
           git config user.email github-actions@github.com
+
           git config pull.rebase false
+
           git add --all
+
           git commit -m "Execute notebooks"
+
           git fetch
+
           git checkout gh-pages
+
           git pull
+
           git checkout main
+
           RIVER_VERSION=$(python -c "import river; print(river.__version__)")
+
           mike deploy ${RIVER_VERSION} latest --update-aliases --push --remote https://${GH_TOKEN}@github.com/online-ml/river.git
+
+          '
+      - id: measurement-14
+        name: Record Measurement After Deploy docs
+        uses: green-coding-solutions/eco-ci-energy-estimation@862050e4f01f65b1436e5eca18ba4bd85562f0de
+        with:
+          json-output: true
+          label: Deploy docs
+          task: get-measurement
+      - id: display-measurement
+        name: Display Energy Results
+        uses: green-coding-solutions/eco-ci-energy-estimation@862050e4f01f65b1436e5eca18ba4bd85562f0de
+        with:
+          json-output: true
+          task: display-results
+      - name: Save Total Energy Consumption Data
+        run: echo '${{ steps.final-measurement.outputs.data-total-json }}' > total_energy_consumption.json
+      - name: Upload Energy Consumption Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: total-energy-consumption
+          path: total_energy_consumption.json

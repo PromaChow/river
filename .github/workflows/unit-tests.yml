@@ -1,47 +1,78 @@
 name: unit-tests
-
 on:
-  pull_request:
-    branches:
-      - "*"
   push:
     branches:
       - main
 
 jobs:
   run:
-    strategy:
-      matrix:
-        os: [ubuntu-latest]
-        python-version: ["3.13", "3.12", "3.11", "3.10"]
-
     runs-on: ${{ matrix.os }}
-
     steps:
+      - name: Start Energy Measurement
+        uses: green-coding-solutions/eco-ci-energy-estimation@862050e4f01f65b1436e5eca18ba4bd85562f0de
+        with:
+          json-output: true
+          task: start-measurement
       - uses: actions/checkout@v4
-
       - name: Build River
         uses: ./.github/actions/install-env
         with:
           python-version: ${{ matrix.python-version }}
-
       - name: Cache River datasets
         uses: actions/cache@v4
         with:
-          path: ~/river_data
           key: ${{ runner.os }}
-
+          path: ~/river_data
       - name: Cache scikit-learn datasets
         uses: actions/cache@v4
         with:
-          path: ~/scikit_learn_data
           key: ${{ runner.os }}
-
+          path: ~/scikit_learn_data
       - name: Download datasets
-        run: |
-          poetry run python -c "from river import datasets; datasets.CreditCard().download(); datasets.Elec2().download(); datasets.SMSSpam().download()"
+        run: 'poetry run python -c "from river import datasets; datasets.CreditCard().download();
+          datasets.Elec2().download(); datasets.SMSSpam().download()"
+
           poetry run python -c "from river import bandit; bandit.datasets.NewsArticles().download()"
 
+          '
+      - id: measurement-6
+        name: Record Measurement After Download datasets
+        uses: green-coding-solutions/eco-ci-energy-estimation@862050e4f01f65b1436e5eca18ba4bd85562f0de
+        with:
+          json-output: true
+          label: Download datasets
+          task: get-measurement
       - name: pytest
-        run: |
-          poetry run pytest -m "not datasets" --durations=10 -n logical # Run pytest on all logical CPU cores
+        run: 'poetry run pytest -m "not datasets" --durations=10 -n logical # Run
+          pytest on all logical CPU cores
+
+          '
+      - id: measurement-8
+        name: Record Measurement After pytest
+        uses: green-coding-solutions/eco-ci-energy-estimation@862050e4f01f65b1436e5eca18ba4bd85562f0de
+        with:
+          json-output: true
+          label: pytest
+          task: get-measurement
+      - id: display-measurement
+        name: Display Energy Results
+        uses: green-coding-solutions/eco-ci-energy-estimation@862050e4f01f65b1436e5eca18ba4bd85562f0de
+        with:
+          json-output: true
+          task: display-results
+      - name: Save Total Energy Consumption Data
+        run: echo '${{ steps.final-measurement.outputs.data-total-json }}' > total_energy_consumption.json
+      - name: Upload Energy Consumption Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: total-energy-consumption
+          path: total_energy_consumption.json
+    strategy:
+      matrix:
+        os:
+          - ubuntu-latest
+        python-version:
+          - '3.13'
+          - '3.12'
+          - '3.11'
+          - '3.10'
